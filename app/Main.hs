@@ -4,6 +4,5 @@ import Spinner (spin)
 import Weaver (weave)
 
 
--- | @cabal run witweave -- -w 800 -h 800 -o witweave.svg@
 main :: IO ()
-main = weave =<< spin "/Users/clewos/witweave/app/"
+main = weave =<< spin "/Users/wodishly/witweave/app/"

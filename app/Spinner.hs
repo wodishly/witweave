@@ -16,11 +16,12 @@ import qualified Data.Text as T
     null,
     pack,
     reverse,
+    splitAt,
     tail,
     tails,
     take,
     takeWhile,
-    words, splitAt, unpack,
+    words,
   )
 
 import Spider
@@ -62,7 +63,7 @@ makeIncomes writ = mapMaybe incomeName (T.tails writ)
     takeName importstaves = Just . T.takeWhile (not . isSpace) . T.drop (T.length importstaves)
 
 cleanIncomes :: [Writ] -> Writ -> Writ
-cleanIncomes writs writ@Writ { incomes } = writ { incomes = filter (has (map (.name) writs)) incomes }
+cleanIncomes writs writ@Writ { incymas } = writ { incymas = filter (has (map (.nama) writs)) incymas }
 
 makeWits' :: [Wit] -> (T.Text, T.Text) -> [Wit]
 makeWits' wits (_, "") = reverse wits
@@ -71,37 +72,37 @@ makeWits' wits (forestaves, afterstaves) = makeWits' newWits (leftyoke (forestav
     newWits
       | T.splitAt 2 (T.take 4 afterstaves) == (" :", ": ") && isNothing (T.find isSpace (T.takeWhile (not . isNewline) forestaves)) = wit:wits
       | otherwise = wits
-    (name, _) = first T.reverse (T.break isNewline forestaves)
-    (kind, rest) = T.break isNewline (T.drop 4 afterstaves)
-    (body, _) = first T.reverse (leap ("", rest))
+    (nama, _) = first T.reverse (T.break isNewline forestaves)
+    (gecynd, rest) = T.break isNewline (T.drop 4 afterstaves)
+    (lic, _) = first T.reverse (leap ("", rest))
       where
         leap (l, r)
           | T.length r < 4 = (T.append (T.reverse r) l, "")
           | T.take 4 r == " :: " = (T.dropWhile (not . isNewline) l, r)
           | otherwise = leap (leftyoke (l, r))
     wit = Wit {
-      name,
-      kind,
-      body,
-      inTell = -1,
-      outTell = -1
+      nama,
+      gecynd,
+      lic,
+      ingetael = -1,
+      utgetael = -1
     }
 
 makeAndTellYokes :: [Wit] -> ([Wit], [Yoke])
 makeAndTellYokes wits = (map tellYokes wits, yokes)
   where
     yokes = concatMap reckonYokes wits
-    tellYokes wit@Wit { name } = wit {
-        outTell = inout fst,
-        inTell = inout snd
+    tellYokes wit@Wit { nama } = wit {
+        utgetael = inout fst,
+        ingetael = inout snd
       } where
-          inout which = length (filter (== name) (map which yokes))
-    reckonYokes Wit { name, body } = headsAnd tails
+          inout which = length (filter (== nama) (map which yokes))
+    reckonYokes Wit { nama, lic } = headsAnd tails
       where
-        headsAnd = map ((name, ) . (.name))
+        headsAnd = map ((nama, ) . (.nama))
         tails = filter (\x -> all ($ x) [isNotOwnName, isFreestandingName]) wits
-        isNotOwnName x = name /= x.name
-        isFreestandingName x = has (map trimUnnamies (T.words body)) x.name
+        isNotOwnName x = nama /= x.nama
+        isFreestandingName x = has (map trimUnnamies (T.words lic)) x.nama
 
 getShortwritname :: String -> T.Text
 getShortwritname = T.reverse . T.takeWhile (/= '/') . T.tail . T.dropWhile (/= '.') . T.reverse . T.pack

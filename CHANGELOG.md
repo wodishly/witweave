@@ -1,5 +1,5 @@
 # Revision history for witweave
 
-## 0.1.0.0 -- YYYY-mm-dd
+## 0.1.0.0 -- 2025-12-02
 
-* First version. Released on an unsuspecting world.
+* Now look and cook, this cooklist book,

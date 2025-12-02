@@ -1,8 +1,4 @@
-{- HLINT ignore "Use infix" -}
 module Weever (weeve) where
-
-import Diagrams.Prelude (Diagram, local, verySmall, (^/), abbreviatedFields)
-import Diagrams.Backend.SVG.CmdLine (B)
 
 import Diagrams.BoundingBox (boundingBox, getCorners)
 import Diagrams.Names (IsName, named)
@@ -19,49 +15,45 @@ import Diagrams.Util (with, (#))
 import qualified Data.Text as T (Text, length, unpack)
 
 import Spider
-import Diagrams.TwoD.Model (showOrigin, showEnvelope)
-import Control.Arrow ((>>>))
 
 
 instance IsName T.Text
 
-data Settings = Settings {
-  writrim :: Double,
-  knotgreat :: V2 Double
+data Weevewit = Weevewit {
+  gewritrima :: Double,
+  cnottamicel :: V2 Double,
+  staefmicel :: Double
 } deriving (Eq, Show)
 
-witSettings :: Settings
-witSettings = Settings {
-  writrim = 1,
-  knotgreat = V2 5 1.5
+weevewit :: Weevewit
+weevewit = Weevewit {
+  gewritrima = 1,
+  cnottamicel = V2 5 1.5,
+  staefmicel = 9
 }
 
 weeve :: Writ -> Diagram B
-weeve Writ { name, wits, yokes } =
-  wrapWrit writ name
-  # named name
+weeve Writ { nama, wittu, geocu } =
+  wrapWrit writ nama
+  # named nama
   # bgFrame 1 dwhelk
   # lc lwhelk
-  # showOrigin
   where
-    b = case getCorners (boundingBox writ) of
-      Just (P (V2 x y), P (V2 a b)) -> 1
-      Nothing -> error "wah"
-    writ = layYokesOfWits wits yokes
-      # foldMap (uncurry drawArrows . bimap (witByName wits) (witByName wits)) yokes
+    writ = layYokesOfWits wittu geocu
+      # foldMap (uncurry (on drawArrow (witByName wittu))) geocu
 
 wrapWrit :: Diagram B -> T.Text -> Diagram B
 wrapWrit diagram writname = vsep 1 [
-    --road,-- # rightsteading,
-    diagram <> (roundedRect w h 1 # rightsteading)
+    road # rightsteading,
+    diagram <> (roundedRect wide high 1 # rightsteading)
   ] where
-    (P bl, P tr) = fromMaybe (P (V2 0 0), P (V2 0 0)) (getCorners (boundingBox diagram))
-    V2 w h = V2 r r + tr - bl
-    r = writrim witSettings
-    --road = alignedText 0.5 0.5 (T.unpack writname++".hs")
-    --  # lc lwhelk
-    --  # fc lwhelk
-    rightsteading = translate ((V2 (w-5-r) -(h-1.5-r)) ^/ 2)
+    (P bole, P tori) = fromMaybe (P (V2 0 0), P (V2 0 0)) (getCorners (boundingBox diagram))
+    V2 wide high = V2 rim rim + tori - bole
+    rim = gewritrima weevewit
+    road = alignedText 0.5 0.5 (T.unpack writname++".hs")
+      # lc lwhelk
+      # fc lwhelk
+    rightsteading = translate ((V2 (wide-5-rim) -(high-1.5-rim)) ^/ 2)
 
 layYokesOfWits :: [Wit] -> [Yoke] -> Diagram B
 layYokesOfWits wits yokes = vsep 1 (drawYokesOfWits wits yokes [])
@@ -69,9 +61,9 @@ layYokesOfWits wits yokes = vsep 1 (drawYokesOfWits wits yokes [])
 drawYokesOfWits :: [Wit] -> [Yoke] -> [T.Text] -> [Diagram B]
 drawYokesOfWits [] _ _ = []
 drawYokesOfWits (wit:wits) yokes drawns
-  | elem wit.name (map snd yokes) = drawYokesOfWits wits yokes drawns
+  | has (map snd yokes) wit.nama = drawYokesOfWits wits yokes drawns
   | otherwise = diagram : drawYokesOfWits wits yokes (newDrawns++drawns)
-      where (newDrawns, diagram) = drawWitAndYokedWits yokes drawns wit.name
+      where (newDrawns, diagram) = drawWitAndYokedWits yokes drawns wit.nama
 
 drawWitAndYokedWits :: [(T.Text, T.Text)] -> [T.Text] -> T.Text -> ([T.Text], Diagram B)
 drawWitAndYokedWits yells drawns thisTail = (concat newDrawnses ++ drawns, ) $ drawKnots thisTail
@@ -79,22 +71,26 @@ drawWitAndYokedWits yells drawns thisTail = (concat newDrawnses ++ drawns, ) $ d
   # translateX 9
   where (newTails, badArrows) = first (map snd) (sunder f yells)
         (newDrawnses, diagrams) = unzip (map (drawWitAndYokedWits badArrows (drawns++newTails)) newTails)
-        f (t, h) = t == thisTail && notElem h drawns
+        f (t, h) = t == thisTail && nas drawns h
 
 drawKnots :: T.Text -> Diagram B
-drawKnots name = alignedText 0.5 0.5 (T.unpack name)
+drawKnots name =
+  alignedText 0.5 0.5 (T.unpack name)
+  # fontSize (local (bestave name))
   # fc lwhelk
-  # fontSize (local (min 1 (9/fromIntegral (T.length name))))
- <> roundedRect w h 0.5
+ <> roundedRect wide high 0.5
   # named name
-  where V2 w h = knotgreat witSettings
+  where V2 wide high = cnottamicel weevewit
 
-drawArrows :: Wit -> Wit -> Diagram B -> Diagram B
-drawArrows endwit startwit = (# connectOutside' feather startwit.name endwit.name)
+bestave :: T.Text -> Double
+bestave = min 1 . (staefmicel weevewit /) . fromIntegral . T.length
+
+drawArrow :: Wit -> Wit -> Diagram B -> Diagram B
+drawArrow = flip (on (# connectOutside' feather) (.nama))
   where
-    feather = with
-      & arrowHead .~ thorn
-      & headLength .~ verySmall
+  feather = with
+    & arrowHead .~ thorn
+    & headLength .~ verySmall
 
 witByName :: [Wit] -> T.Text -> Wit
-witByName wits x = fromJust (find ((== x) . (.name)) wits)
+witByName wits name = fromJust (find ((== name) . (.nama)) wits)
