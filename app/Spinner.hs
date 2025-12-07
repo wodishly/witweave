@@ -1,135 +1,149 @@
 module Spinner (spin) where
 
-import qualified Data.Text as T
-  ( Text,
-    append,
-    break,
-    cons,
-    drop,
-    dropWhile,
-    find,
-    head,
-    init,
-    isPrefixOf,
-    last,
-    length,
-    null,
-    pack,
-    reverse,
-    splitAt,
-    tail,
-    tails,
-    take,
-    takeWhile,
-    words,
+import System.Directory (listDirectory)
+import Text.Megaparsec (
+  MonadParsec (lookAhead, notFollowedBy, takeWhileP),
+  Parsec,
+  Stream (Tokens),
+  anySingle,
+  chunk,
+  errorBundlePretty,
+  manyTill,
+  manyTill_,
+  parse,
+  skipManyTill,
   )
+import Text.Megaparsec.Char (newline, space)
+
+import qualified Data.Text as T (
+  Text,
+  drop,
+  isPrefixOf,
+  strip,
+  unlines,
+  unwords,
+  words,
+  )
+import qualified Data.Text.IO as T (readFile)
 
 import Spider
 
 
-spin :: FilePath -> IO [Writ]
-spin staves
-  | isHaskell staves = spinOne staves
-  | last staves == '/' = spinMany staves
-  | otherwise = error "no"
+type Spin = Parsec Void T.Text
 
-spinOne :: FilePath -> IO [Writ]
-spinOne staves = do
-  writ <- readFile staves
-  let (is, ws) = makeIncomesAndWits (T.pack writ)
-      (ws', ys) = makeAndTellYokes ws
-  return [Writ (getShortwritname staves) is ws' ys]
+spin :: FilePath -> IO [Leaf]
+spin road
+  | isLeafroad road = shell <$> spinOne road
+  | isBranchroad road = spinMany road
+  | otherwise = error road
 
-spinMany :: FilePath -> IO [Writ]
-spinMany staves = do
-  allnames <- listDirectory staves
-  let shortwritnames = filter isHaskell allnames
-      longwritnames = map (staves++) shortwritnames
-  writlists <- mapM spinOne longwritnames
-  let writlist = concat writlists
-  return (map (cleanIncomes writlist) writlist)
+spinMany :: FilePath -> IO [Leaf]
+spinMany road = do
+  (shortLeafroads, shortOtherRoads) <- sunder isLeafroad <$> listDirectory road
+  let shortBranchroads = mapMaybe asBranch shortOtherRoads
+      (leafroads, branchroads) = twimap (map (road++)) (shortLeafroads, shortBranchroads)
 
-makeIncomesAndWits :: T.Text -> ([Income], [Wit])
-makeIncomesAndWits writ = (makeIncomes writ, writs)
-  where writs = makeWits' [] ("", writ)
+  underwrits <- concat <$> mapM spin branchroads
+  writs <- mapM spinOne leafroads
+  return $ cleanIncomes writs++underwrits
 
-makeIncomes :: T.Text -> [Income]
-makeIncomes writ = mapMaybe incomeName (T.tails writ)
+asBranch :: FilePath -> Maybe FilePath
+asBranch road = if nas road '.'
+  then Just (road++"/")
+  else Nothing
+
+cleanIncomes :: [Leaf] -> [Leaf]
+cleanIncomes writs = map clean writs
   where
-    incomeName thisTail
-      | T.isPrefixOf "\nimport qualified " thisTail = takeName "\nimport qualified " thisTail
-      | T.isPrefixOf "\nimport " thisTail = takeName "\nimport " thisTail
-      | otherwise = Nothing
-    takeName importstaves = Just . T.takeWhile (not . isSpace) . T.drop (T.length importstaves)
+    clean writ = writ { incomes = filter isNearby writ.incomes }
+    isNearby = has (map (.name) writs)
 
-cleanIncomes :: [Writ] -> Writ -> Writ
-cleanIncomes writs writ@Writ { incymas } = writ { incymas = filter (has (map (.nama) writs)) incymas }
+spinOne :: FilePath -> IO Leaf
+spinOne leafroad = bind (T.readFile leafroad) $
+  parse spin' "" >>> \case
+    Left bundle -> error (errorBundlePretty bundle)
+    Right writ -> return writ
 
-makeWits' :: [Wit] -> (T.Text, T.Text) -> [Wit]
-makeWits' wits (_, "") = reverse wits
-makeWits' wits (forestaves, afterstaves) = makeWits' newWits (leftyoke (forestaves, afterstaves))
+spin' :: Spin Leaf
+spin' = do
+  (_, leafname) <- manyTill_ spinDust spinLeafname
+  incomes <- utmostly spinIncome
+  spells <- utmostly spinSpell
+  return $ Leaf leafname incomes spells (yoke spells)
+
+yoke :: [Spell] -> [Yoke]
+yoke wits = concatMap yoke' wits
   where
-    newWits
-      | T.splitAt 2 (T.take 4 afterstaves) == (" :", ": ") && isNothing (T.find isSpace (T.takeWhile (not . isNewline) forestaves)) = wit:wits
-      | otherwise = wits
-    (nama, _) = first T.reverse (T.break isNewline forestaves)
-    (gecynd, rest) = T.break isNewline (T.drop 4 afterstaves)
-    (lic, _) = first T.reverse (leap ("", rest))
-      where
-        leap (l, r)
-          | T.length r < 4 = (T.append (T.reverse r) l, "")
-          | T.take 4 r == " :: " = (T.dropWhile (not . isNewline) l, r)
-          | otherwise = leap (leftyoke (l, r))
-    wit = Wit {
-      nama,
-      gecynd,
-      lic,
-      ingetael = -1,
-      utgetael = -1
-    }
+  yoke' wit =
+    filter (isCalledBy wit . snd)
+    $ map ((wit.name, ) . (.name)) wits
 
-makeAndTellYokes :: [Wit] -> ([Wit], [Yoke])
-makeAndTellYokes wits = (map tellYokes wits, yokes)
-  where
-    yokes = concatMap reckonYokes wits
-    tellYokes wit@Wit { nama } = wit {
-        utgetael = inout fst,
-        ingetael = inout snd
-      } where
-          inout which = length (filter (== nama) (map which yokes))
-    reckonYokes Wit { nama, lic } = headsAnd tails
-      where
-        headsAnd = map ((nama, ) . (.nama))
-        tails = filter (\x -> all ($ x) [isNotOwnName, isFreestandingName]) wits
-        isNotOwnName x = nama /= x.nama
-        isFreestandingName x = has (map trimUnnamies (T.words lic)) x.nama
+isCalledBy :: Spell -> Spellname -> Bool
+isCalledBy Spell { name, body } = isAllOf [(name /=), has (map shed (T.words body))]
 
-getShortwritname :: String -> T.Text
-getShortwritname = T.reverse . T.takeWhile (/= '/') . T.tail . T.dropWhile (/= '.') . T.reverse . T.pack
+spinDust :: Spin ()
+spinDust = do
+  line <- lookAhead takeLine
+  unless (T.isPrefixOf "module" line) (skipLine >> spinDust)
 
-isHaskell :: FilePath -> Bool
-isHaskell = (".hs" ==) . pord 3
+spinLeafname :: Spin Leafname
+spinLeafname = skipWord "module" >> space >> takeWord
 
-trimUnnamies :: T.Text -> T.Text
-trimUnnamies = trimUnnamies' R . trimUnnamies' L
+spinIncome :: Spin Income
+spinIncome = takeLine >>= maybe spinIncome return . asIncome
 
-trimUnnamies' :: Hand -> T.Text -> T.Text
-trimUnnamies' hand text
-  | T.null text = ""
-  | isNameworthy (edge text) = text
-  | otherwise = trimUnnamies' hand (lave text)
-  where
-    (edge, lave) = case hand of
-      L -> (T.head, T.tail)
-      R -> (T.last, T.init)
+asIncome :: T.Text -> Maybe Income
+asIncome = T.words >>> \case
+  "import":"qualified":income:_ -> Just income
+  "import":income:_ -> Just income
+  _ -> Nothing
 
-isNameworthy :: Char -> Bool
-isNameworthy = isAnyOf [isAlphaNum, has ['\'', '_']]
+spinSpell :: Spin Spell
+spinSpell = bind takeLine $
+  asSpellmark >>> \case
+    Just (name, kind) -> do
+      body <- T.strip <$> spinBody
+      return $ Spell name kind body 0 0
+    Nothing -> spinSpell
 
-isNewline :: Char -> Bool
-isNewline = has ['\n', '\r']
+asSpellmark :: T.Text -> Maybe (Spellname, Kind)
+asSpellmark line = if T.isPrefixOf " " line
+  then Nothing
+  else case T.words line of
+    name:"::":kind -> Just (name, T.unwords kind)
+    _ -> Nothing
 
-leftyoke :: Twain T.Text -> Twain T.Text
-leftyoke (ls, rs)
-  | T.null rs = (ls, rs)
-  | otherwise = (T.cons (T.head rs) ls, T.tail rs)
+spinBody :: Spin Body
+spinBody = do
+  thisBody <- lookAhead takeLine
+  if isNothing (asAside thisBody) && isNothing (asSpellmark thisBody)
+    then do
+      skipLine
+      nextBodies <- spinBody
+      return $ T.unlines [thisBody, nextBodies]
+    else return ""
+
+asAside :: T.Text -> Maybe Aside
+asAside line
+  | T.isPrefixOf "--" line = Just (T.strip (T.drop 2 line))
+  | T.isPrefixOf "{-#" line = Just (T.strip (shave 3 line))
+  | T.isPrefixOf "{-" line = Just (T.strip (shave 2 line))
+  | otherwise = Nothing
+
+takeWord :: Spin (Tokens T.Text)
+takeWord = takeWhileP Nothing (not . isSpace) <* space
+
+takeLine :: Spin T.Text
+takeLine = takeWhileP Nothing (not . isNewline) <* newline
+
+skipWord :: T.Text -> Spin ()
+skipWord = void . chunk
+
+skipLine :: Spin ()
+skipLine = void $ skipAnd newline
+
+skipAnd :: Spin a -> Spin a
+skipAnd = skipManyTill anySingle
+
+utmostly :: Spin a -> Spin [a]
+utmostly = s (manyTill . skipAnd) notFollowedBy

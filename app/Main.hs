@@ -5,4 +5,4 @@ import Weaver (weave)
 
 
 main :: IO ()
-main = weave =<< spin "/Users/wodishly/witweave/app/"
+main = weave =<< spin "/Users/clewos/frogwork/app/"

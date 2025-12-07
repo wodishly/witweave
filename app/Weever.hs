@@ -15,6 +15,8 @@ import Diagrams.Util (with, (#))
 import qualified Data.Text as T (Text, length, unpack)
 
 import Spider
+import Diagrams.Attributes (lwL, thick)
+import Data.Colour.SRGB (Colour, sRGB24read)
 
 
 instance IsName T.Text
@@ -32,15 +34,15 @@ weevewit = Weevewit {
   staefmicel = 9
 }
 
-weeve :: Writ -> Diagram B
-weeve Writ { nama, wittu, geocu } =
-  wrapWrit writ nama
-  # named nama
+weeve :: Leaf -> Diagram B
+weeve Leaf { name, spells, yokes } =
+  wrapWrit writ name
+  # named name
   # bgFrame 1 dwhelk
   # lc lwhelk
   where
-    writ = layYokesOfWits wittu geocu
-      # foldMap (uncurry (on drawArrow (witByName wittu))) geocu
+    writ = layYokesOfSpells spells yokes
+      # foldMap (uncurry (on drawArrow (witByName spells))) yokes
 
 wrapWrit :: Diagram B -> T.Text -> Diagram B
 wrapWrit diagram writname = vsep 1 [
@@ -55,22 +57,22 @@ wrapWrit diagram writname = vsep 1 [
       # fc lwhelk
     rightsteading = translate ((V2 (wide-5-rim) -(high-1.5-rim)) ^/ 2)
 
-layYokesOfWits :: [Wit] -> [Yoke] -> Diagram B
-layYokesOfWits wits yokes = vsep 1 (drawYokesOfWits wits yokes [])
+layYokesOfSpells :: [Spell] -> [Yoke] -> Diagram B
+layYokesOfSpells wits yokes = vsep 1 (drawYokesOfSpells wits yokes [])
 
-drawYokesOfWits :: [Wit] -> [Yoke] -> [T.Text] -> [Diagram B]
-drawYokesOfWits [] _ _ = []
-drawYokesOfWits (wit:wits) yokes drawns
-  | has (map snd yokes) wit.nama = drawYokesOfWits wits yokes drawns
-  | otherwise = diagram : drawYokesOfWits wits yokes (newDrawns++drawns)
-      where (newDrawns, diagram) = drawWitAndYokedWits yokes drawns wit.nama
+drawYokesOfSpells :: [Spell] -> [Yoke] -> [T.Text] -> [Diagram B]
+drawYokesOfSpells [] _ _ = []
+drawYokesOfSpells (wit:wits) yokes drawns
+  | has (map snd yokes) wit.name = drawYokesOfSpells wits yokes drawns
+  | otherwise = diagram : drawYokesOfSpells wits yokes (newDrawns++drawns)
+      where (newDrawns, diagram) = drawSpellAndYokedSpells yokes drawns wit.name
 
-drawWitAndYokedWits :: [(T.Text, T.Text)] -> [T.Text] -> T.Text -> ([T.Text], Diagram B)
-drawWitAndYokedWits yells drawns thisTail = (concat newDrawnses ++ drawns, ) $ drawKnots thisTail
+drawSpellAndYokedSpells :: [(T.Text, T.Text)] -> [T.Text] -> T.Text -> ([T.Text], Diagram B)
+drawSpellAndYokedSpells yells drawns thisTail = (concat newDrawnses ++ drawns, ) $ drawKnots thisTail
  <> vsep 1 diagrams
   # translateX 9
   where (newTails, badArrows) = first (map snd) (sunder f yells)
-        (newDrawnses, diagrams) = unzip (map (drawWitAndYokedWits badArrows (drawns++newTails)) newTails)
+        (newDrawnses, diagrams) = unzip (map (drawSpellAndYokedSpells badArrows (drawns++newTails)) newTails)
         f (t, h) = t == thisTail && nas drawns h
 
 drawKnots :: T.Text -> Diagram B
@@ -80,17 +82,25 @@ drawKnots name =
   # fc lwhelk
  <> roundedRect wide high 0.5
   # named name
+  # lwL 0.1
   where V2 wide high = cnottamicel weevewit
 
 bestave :: T.Text -> Double
 bestave = min 1 . (staefmicel weevewit /) . fromIntegral . T.length
 
-drawArrow :: Wit -> Wit -> Diagram B -> Diagram B
-drawArrow = flip (on (# connectOutside' feather) (.nama))
+drawArrow :: Spell -> Spell -> Diagram B -> Diagram B
+drawArrow = flip (on ((# connectOutside' feather) # lwL 0.1) (.name))
+-- drawArrow = flip (on ((\x y -> (# connectPerim' feather x y halfTurn fullTurn)) # lwL 0.1) (.nama))
   where
   feather = with
     & arrowHead .~ thorn
-    & headLength .~ verySmall
+    & headLength .~ thick
 
-witByName :: [Wit] -> T.Text -> Wit
-witByName wits name = fromJust (find ((== name) . (.nama)) wits)
+witByName :: [Spell] -> T.Text -> Spell
+witByName wits name = fromJust (find ((== name) . (.name)) wits)
+
+lwhelk :: Colour Double
+lwhelk = sRGB24read "#ccccff"
+
+dwhelk :: Colour Double
+dwhelk = sRGB24read "#363c50"

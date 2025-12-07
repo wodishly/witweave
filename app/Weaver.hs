@@ -6,6 +6,6 @@ import Spider
 import Weever (weeve)
 
 
-weave :: [Writ] -> IO ()
+weave :: [Leaf] -> IO ()
 weave writs = mainWith $ hcat (map (vcat . map weeve) (groupWith howManyIncomes writs))
-  where howManyIncomes = length . intersect (map (.nama) writs) . incymas
+  where howManyIncomes = length . intersect (map (.name) writs) . incomes
